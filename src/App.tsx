@@ -293,7 +293,11 @@ export default function App() {
       </div>
 
       <div className="year-nav">
-        <button className="secondary" onClick={() => setYear((y) => y - 1)}>
+        <button
+          className="secondary"
+          disabled={year <= new Date().getFullYear()}
+          onClick={() => setYear((y) => y - 1)}
+        >
           Prev
         </button>
         <span>{year}</span>

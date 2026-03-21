@@ -32,11 +32,19 @@ export default function Calendar({
   disabledDates,
   onToggleDay,
 }: Props) {
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const today = formatDate(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  // Filter to only show current month onward (for current year) or all months (future years)
+  const visibleMonths = MONTHS
+    .map((name, idx) => ({ name, idx }))
+    .filter(({ idx }) => year > currentYear || idx >= currentMonth);
 
   return (
     <div className="calendar-grid">
-      {MONTHS.map((monthName, monthIdx) => {
+      {visibleMonths.map(({ name: monthName, idx: monthIdx }) => {
         const firstDay = new Date(year, monthIdx, 1).getDay();
         const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
         const cells: React.ReactNode[] = [];
@@ -56,9 +64,11 @@ export default function Calendar({
           const isOverBudget = overBudgetDates.has(dateStr);
           const isDisabled = disabledDates.has(dateStr);
           const isToday = dateStr === today;
+          const isPast = dateStr < today;
 
           let className = 'day-cell';
-          if (isWeekend) className += ' weekend';
+          if (isPast) className += ' weekend'; // reuse weekend styling for past dates
+          else if (isWeekend) className += ' weekend';
           else if (isHoliday) className += ' holiday';
           else if (isSelected) {
             className += ' selected-pto';
@@ -84,7 +94,7 @@ export default function Calendar({
               className={className}
               title={title}
               onClick={() => {
-                if (isWeekend || isHoliday) return;
+                if (isPast || isWeekend || isHoliday) return;
                 if (isSelected) {
                   // Always allow deselecting
                   onToggleDay(dateStr);

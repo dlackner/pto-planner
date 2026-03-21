@@ -41,7 +41,10 @@ export function getObservedHolidays(year: number): { date: string; name: string 
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function observedDate(year: number, month: number, day: number): string {
@@ -68,7 +71,11 @@ function lastWeekday(year: number, month: number, weekday: number): string {
 }
 
 // Generate smart recommendations for a given year
-export function getRecommendations(year: number): Recommendation[] {
+// personalDates: array of { label, mmdd } like { label: 'Birthday', mmdd: '03-15' }
+export function getRecommendations(
+  year: number,
+  personalDates: { label: string; mmdd: string }[] = []
+): Recommendation[] {
   const holidays = getObservedHolidays(year);
   const holidayDates = new Set(holidays.map(h => h.date));
   const recommendations: Recommendation[] = [];
@@ -126,10 +133,25 @@ export function getRecommendations(year: number): Recommendation[] {
     }
   }
 
-  // Bridge days: if a holiday falls on Tuesday, suggest Monday off; Thursday, suggest Friday off
+  // Bridge days: suggest extending any holiday into a long weekend
   for (const holiday of holidays) {
     const hd = new Date(holiday.date);
     const dow = hd.getDay();
+
+    if (dow === 1) {
+      // Monday holiday -> take Friday before for a 4-day weekend
+      const friday = new Date(hd);
+      friday.setDate(friday.getDate() - 3);
+      const fs = formatDate(friday);
+      if (!holidayDates.has(fs)) {
+        recommendations.push({
+          key: `bridge-${holiday.date}`,
+          label: `Extend: ${holiday.name}`,
+          description: `Take Friday off for a 4-day weekend`,
+          dates: [fs],
+        });
+      }
+    }
 
     if (dow === 2) {
       // Tuesday holiday -> take Monday off
@@ -142,6 +164,27 @@ export function getRecommendations(year: number): Recommendation[] {
           label: `Bridge: ${holiday.name}`,
           description: `Take Monday off for a 4-day weekend`,
           dates: [ms],
+        });
+      }
+    }
+
+    if (dow === 3) {
+      // Wednesday holiday -> suggest Mon+Tue or Thu+Fri for a 5-day break
+      const dates: string[] = [];
+      for (const offset of [-2, -1, 1, 2]) {
+        const d = new Date(hd);
+        d.setDate(d.getDate() + offset);
+        const ds = formatDate(d);
+        if (d.getDay() > 0 && d.getDay() < 6 && !holidayDates.has(ds)) {
+          dates.push(ds);
+        }
+      }
+      if (dates.length > 0) {
+        recommendations.push({
+          key: `bridge-${holiday.date}`,
+          label: `Extend: ${holiday.name}`,
+          description: `${dates.length} days to build a week around ${holiday.name}`,
+          dates,
         });
       }
     }
@@ -160,35 +203,82 @@ export function getRecommendations(year: number): Recommendation[] {
         });
       }
     }
+
+    if (dow === 5) {
+      // Friday holiday -> take Monday after for a 4-day weekend
+      const monday = new Date(hd);
+      monday.setDate(monday.getDate() + 3);
+      const ms = formatDate(monday);
+      if (!holidayDates.has(ms)) {
+        recommendations.push({
+          key: `bridge-${holiday.date}`,
+          label: `Extend: ${holiday.name}`,
+          description: `Take Monday off for a 4-day weekend`,
+          dates: [ms],
+        });
+      }
+    }
   }
 
-  // July 4th week - if it falls mid-week, suggest surrounding days
+  // July 4th week - suggest surrounding weekdays for a full week off
   {
     const july4 = holidays.find(h => h.name === 'Independence Day')?.date;
     if (july4) {
       const j4 = new Date(july4);
-      const dow = j4.getDay();
-      if (dow === 3) {
-        // Wednesday - suggest Mon, Tue, Thu, Fri
-        const dates: string[] = [];
-        for (let offset = -2; offset <= 2; offset++) {
-          if (offset === 0) continue;
-          const d = new Date(j4);
-          d.setDate(d.getDate() + offset);
-          const ds = formatDate(d);
-          if (d.getDay() > 0 && d.getDay() < 6 && !holidayDates.has(ds)) {
-            dates.push(ds);
-          }
-        }
-        if (dates.length > 0) {
-          recommendations.push({
-            key: `july4-week-${year}`,
-            label: 'July 4th Week',
-            description: `${dates.length} days for a full week around Independence Day`,
-            dates,
-          });
+      const dates: string[] = [];
+      // Check Mon-Fri of the same week
+      const dayOfWeek = j4.getDay();
+      // Find Monday of that week
+      const monday = new Date(j4);
+      monday.setDate(monday.getDate() - (dayOfWeek - 1));
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(monday);
+        d.setDate(d.getDate() + i);
+        const ds = formatDate(d);
+        if (!holidayDates.has(ds) && d.getDay() > 0 && d.getDay() < 6) {
+          dates.push(ds);
         }
       }
+      if (dates.length > 0) {
+        recommendations.push({
+          key: `july4-week-${year}`,
+          label: 'July 4th Week',
+          description: `${dates.length} day${dates.length > 1 ? 's' : ''} for a full week around Independence Day`,
+          dates,
+        });
+      }
+    }
+  }
+
+  // Personal dates (birthday, anniversary, etc.)
+  for (const { label, mmdd } of personalDates) {
+    if (!mmdd || !/^\d{2}-\d{2}$/.test(mmdd)) continue;
+    const [mm, dd] = mmdd.split('-').map(Number);
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) continue;
+
+    const d = new Date(year, mm - 1, dd);
+    const ds = formatDate(d);
+    const dow = d.getDay();
+
+    // If it falls on a weekend, suggest the nearest weekday
+    let targetDate = ds;
+    if (dow === 0) {
+      const fri = new Date(d);
+      fri.setDate(fri.getDate() - 2);
+      targetDate = formatDate(fri);
+    } else if (dow === 6) {
+      const fri = new Date(d);
+      fri.setDate(fri.getDate() - 1);
+      targetDate = formatDate(fri);
+    }
+
+    if (!holidayDates.has(targetDate)) {
+      recommendations.push({
+        key: `personal-${label.toLowerCase()}-${year}`,
+        label: label,
+        description: `Take ${mmdd} off for your ${label.toLowerCase()}`,
+        dates: [targetDate],
+      });
     }
   }
 

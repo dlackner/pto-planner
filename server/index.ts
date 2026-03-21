@@ -60,6 +60,8 @@ const migrations = [
   `ALTER TABLE user_settings ADD COLUMN hours_per_day REAL DEFAULT 8`,
   `ALTER TABLE user_settings ADD COLUMN max_accrual REAL DEFAULT 0`,
   `ALTER TABLE user_settings ADD COLUMN current_hours REAL DEFAULT 0`,
+  `ALTER TABLE user_settings ADD COLUMN birthday TEXT DEFAULT ''`,
+  `ALTER TABLE user_settings ADD COLUMN anniversary TEXT DEFAULT ''`,
 ];
 for (const sql of migrations) {
   try { db.exec(sql); } catch (_) { /* column already exists */ }
@@ -96,10 +98,10 @@ app.get('/api/users/:id/settings', (req, res) => {
 
 // Update user settings
 app.put('/api/users/:id/settings', (req, res) => {
-  const { accrual_rate, current_hours, sick_days, buffer_days, hours_per_day, max_accrual, pay_frequency } = req.body;
+  const { accrual_rate, current_hours, sick_days, buffer_days, hours_per_day, max_accrual, pay_frequency, birthday, anniversary } = req.body;
   db.prepare(`
-    INSERT INTO user_settings (user_id, accrual_rate, current_hours, sick_days, buffer_days, hours_per_day, max_accrual, pay_frequency)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO user_settings (user_id, accrual_rate, current_hours, sick_days, buffer_days, hours_per_day, max_accrual, pay_frequency, birthday, anniversary)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET
       accrual_rate = excluded.accrual_rate,
       current_hours = excluded.current_hours,
@@ -107,8 +109,10 @@ app.put('/api/users/:id/settings', (req, res) => {
       buffer_days = excluded.buffer_days,
       hours_per_day = excluded.hours_per_day,
       max_accrual = excluded.max_accrual,
-      pay_frequency = excluded.pay_frequency
-  `).run(req.params.id, accrual_rate, current_hours || 0, sick_days, buffer_days || 0, hours_per_day || 8, max_accrual || 0, pay_frequency);
+      pay_frequency = excluded.pay_frequency,
+      birthday = excluded.birthday,
+      anniversary = excluded.anniversary
+  `).run(req.params.id, accrual_rate, current_hours || 0, sick_days, buffer_days || 0, hours_per_day || 8, max_accrual || 0, pay_frequency, birthday || '', anniversary || '');
   res.json({ success: true });
 });
 

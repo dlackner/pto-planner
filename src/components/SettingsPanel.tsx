@@ -89,6 +89,26 @@ export default function SettingsPanel({ settings, onChange }: Props) {
             <option value="monthly">Monthly (12/yr)</option>
           </select>
         </div>
+        <div className="field">
+          <label>Birthday (month/day)</label>
+          <input
+            type="text"
+            placeholder="MM-DD"
+            maxLength={5}
+            value={settings.birthday || ''}
+            onChange={(e) => onChange({ birthday: e.target.value })}
+          />
+        </div>
+        <div className="field">
+          <label>Anniversary (month/day)</label>
+          <input
+            type="text"
+            placeholder="MM-DD"
+            maxLength={5}
+            value={settings.anniversary || ''}
+            onChange={(e) => onChange({ anniversary: e.target.value })}
+          />
+        </div>
       </div>
     </div>
   );

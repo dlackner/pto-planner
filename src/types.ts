@@ -13,6 +13,8 @@ export interface UserSettings {
   hours_per_day: number;
   max_accrual: number;
   pay_frequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+  birthday: string;     // MM-DD
+  anniversary: string;  // MM-DD
 }
 
 export interface PtoDay {

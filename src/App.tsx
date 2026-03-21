@@ -35,6 +35,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   hours_per_day: 8,
   max_accrual: 0,
   pay_frequency: 'biweekly',
+  birthday: '',
+  anniversary: '',
 };
 
 export default function App() {
@@ -93,7 +95,14 @@ export default function App() {
   );
 
   // Recommendations
-  const recommendations = useMemo(() => getRecommendations(year), [year]);
+  const personalDates = useMemo(() => {
+    const dates: { label: string; mmdd: string }[] = [];
+    if (settings.birthday) dates.push({ label: 'Birthday', mmdd: settings.birthday });
+    if (settings.anniversary) dates.push({ label: 'Anniversary', mmdd: settings.anniversary });
+    return dates;
+  }, [settings.birthday, settings.anniversary]);
+
+  const recommendations = useMemo(() => getRecommendations(year, personalDates), [year, personalDates]);
   const recommendedDates = useMemo(() => {
     const dates = new Set<string>();
     for (const rec of recommendations) {

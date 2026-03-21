@@ -12,35 +12,35 @@ export default function SettingsPanel({ settings, onChange }: Props) {
       <h2>Settings</h2>
       <div className="settings-grid">
         <div className="field">
-          <label>Hours per paycheck</label>
+          <label>Accrual per paycheck</label>
           <input
             type="number"
             step="0.01"
             min="0"
             value={settings.accrual_rate || ''}
-            placeholder="0.00"
+            placeholder="0 hrs"
             onChange={(e) => onChange({ accrual_rate: parseFloat(e.target.value) || 0 })}
           />
         </div>
         <div className="field">
-          <label>Current PTO balance (hrs)</label>
+          <label>Current PTO balance</label>
           <input
             type="number"
             step="0.5"
             min="0"
             value={settings.current_hours || ''}
-            placeholder="0"
+            placeholder="0 hrs"
             onChange={(e) => onChange({ current_hours: parseFloat(e.target.value) || 0 })}
           />
         </div>
         <div className="field">
-          <label>Max accrual cap (hrs)</label>
+          <label>Max accrual cap</label>
           <input
             type="number"
             step="1"
             min="0"
             value={settings.max_accrual || ''}
-            placeholder="No limit"
+            placeholder="No limit (hrs)"
             onChange={(e) => onChange({ max_accrual: parseFloat(e.target.value) || 0 })}
           />
         </div>
@@ -51,7 +51,7 @@ export default function SettingsPanel({ settings, onChange }: Props) {
             step="0.5"
             min="1"
             value={settings.hours_per_day || ''}
-            placeholder="8"
+            placeholder="8 hrs"
             onChange={(e) => onChange({ hours_per_day: parseFloat(e.target.value) || 8 })}
           />
         </div>
@@ -62,18 +62,18 @@ export default function SettingsPanel({ settings, onChange }: Props) {
             step="0.5"
             min="0"
             value={settings.sick_days || ''}
-            placeholder="0"
+            placeholder="0 days"
             onChange={(e) => onChange({ sick_days: parseFloat(e.target.value) || 0 })}
           />
         </div>
         <div className="field">
-          <label>Buffer days (reserve)</label>
+          <label>Buffer days</label>
           <input
             type="number"
             step="0.5"
             min="0"
             value={settings.buffer_days || ''}
-            placeholder="0"
+            placeholder="0 days"
             onChange={(e) => onChange({ buffer_days: parseFloat(e.target.value) || 0 })}
           />
         </div>
@@ -90,7 +90,7 @@ export default function SettingsPanel({ settings, onChange }: Props) {
           </select>
         </div>
         <div className="field">
-          <label>Birthday (month/day)</label>
+          <label>Birthday</label>
           <input
             type="text"
             placeholder="MM-DD"
@@ -100,7 +100,7 @@ export default function SettingsPanel({ settings, onChange }: Props) {
           />
         </div>
         <div className="field">
-          <label>Anniversary (month/day)</label>
+          <label>Anniversary</label>
           <input
             type="text"
             placeholder="MM-DD"

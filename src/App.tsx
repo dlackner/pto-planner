@@ -114,7 +114,7 @@ export default function App() {
     return dates;
   }, [recommendations, enabledRecs]);
 
-  // Selected PTO days for current year
+  // Manually selected PTO days for current year (not including recommendations)
   const selectedDaysThisYear = useMemo(() => {
     const set = new Set<string>();
     for (const day of ptoDays) {
@@ -122,12 +122,17 @@ export default function App() {
         set.add(day.date);
       }
     }
-    // Add recommended dates that are enabled
+    return set;
+  }, [ptoDays, year]);
+
+  // All planned days (manual + recommended) for budget calculation
+  const allPlannedDays = useMemo(() => {
+    const set = new Set(selectedDaysThisYear);
     for (const d of recommendedDates) {
       set.add(d);
     }
     return set;
-  }, [ptoDays, year, recommendedDates]);
+  }, [selectedDaysThisYear, recommendedDates]);
 
   // PTO accumulation logic in HOURS with max accrual cap
   const { overBudgetDates, disabledDates, projectedBalanceHrs, totalAccrualHrs } = useMemo(() => {
@@ -138,7 +143,7 @@ export default function App() {
     const hrsPerDay = settings.hours_per_day || 8;
     const maxCap = settings.max_accrual || 0; // 0 = no cap
 
-    const sortedDates = Array.from(selectedDaysThisYear).sort();
+    const sortedDates = Array.from(allPlannedDays).sort();
     const overBudget = new Set<string>();
     const bufferHrs = (settings.buffer_days || 0) * hrsPerDay;
     let balanceHrs = (settings.current_hours || 0) - bufferHrs;
@@ -180,7 +185,7 @@ export default function App() {
       projectedBalanceHrs: projected,
       totalAccrualHrs: totalAccrual,
     };
-  }, [selectedDaysThisYear, settings]);
+  }, [allPlannedDays, settings]);
 
   // Toggle a day
   const handleToggleDay = async (date: string) => {
@@ -259,7 +264,7 @@ export default function App() {
 
       <PtoSummary
         currentBalanceHrs={settings.current_hours || 0}
-        totalSelected={selectedDaysThisYear.size}
+        totalSelected={allPlannedDays.size}
         totalAccrualHrs={totalAccrualHrs}
         projectedBalanceHrs={projectedBalanceHrs}
         hoursPerDay={settings.hours_per_day || 8}
@@ -303,12 +308,12 @@ export default function App() {
         <button className="secondary" onClick={() => setYear((y) => y + 1)}>
           Next
         </button>
-        {selectedDaysThisYear.size > 0 && (
+        {allPlannedDays.size > 0 && (
           <button
             className="secondary export-btn"
             onClick={() =>
               downloadICS(
-                Array.from(selectedDaysThisYear),
+                Array.from(allPlannedDays),
                 `pto-${year}.ics`
               )
             }

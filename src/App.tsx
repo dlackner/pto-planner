@@ -262,7 +262,6 @@ export default function App() {
         totalSelected={selectedDaysThisYear.size}
         totalAccrualHrs={totalAccrualHrs}
         projectedBalanceHrs={projectedBalanceHrs}
-        sickDays={settings.sick_days || 0}
         hoursPerDay={settings.hours_per_day || 8}
         maxAccrual={settings.max_accrual || 0}
       />

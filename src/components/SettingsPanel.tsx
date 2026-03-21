@@ -56,17 +56,6 @@ export default function SettingsPanel({ settings, onChange }: Props) {
           />
         </div>
         <div className="field">
-          <label>Sick days</label>
-          <input
-            type="number"
-            step="0.5"
-            min="0"
-            value={settings.sick_days || ''}
-            placeholder="0 days"
-            onChange={(e) => onChange({ sick_days: parseFloat(e.target.value) || 0 })}
-          />
-        </div>
-        <div className="field">
           <label>Buffer days</label>
           <input
             type="number"

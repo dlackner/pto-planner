@@ -5,7 +5,6 @@ interface Props {
   totalSelected: number;
   totalAccrualHrs: number;
   projectedBalanceHrs: number;
-  sickDays: number;
   hoursPerDay: number;
   maxAccrual: number;
 }
@@ -15,7 +14,6 @@ export default function PtoSummary({
   totalSelected,
   totalAccrualHrs,
   projectedBalanceHrs,
-  sickDays,
   hoursPerDay,
   maxAccrual,
 }: Props) {
@@ -56,10 +54,6 @@ export default function PtoSummary({
           <span className="stat-value">{maxAccrual.toFixed(0)}h</span>
         </div>
       )}
-      <div className="stat">
-        <span className="stat-label">Sick Days</span>
-        <span className="stat-value">{sickDays.toFixed(1)}</span>
-      </div>
     </div>
   );
 }

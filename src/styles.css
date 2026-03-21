@@ -73,6 +73,10 @@ body {
   border-color: var(--accent);
 }
 
+.skip-btn {
+  font-size: 0.8125rem;
+}
+
 /* Buttons */
 button {
   padding: 0.625rem 1rem;
@@ -212,6 +216,12 @@ button.secondary:hover {
 
 .stat-value.positive { color: var(--green); }
 .stat-value.negative { color: var(--red); }
+
+.stat-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
 
 /* Recommendations */
 .recommendations {

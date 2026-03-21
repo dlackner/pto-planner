@@ -16,17 +16,6 @@ const PAY_PERIODS: Record<string, number> = {
   monthly: 12,
 };
 
-function getPayPeriodsRemainingInYear(frequency: string): number {
-  const now = new Date();
-  const year = now.getFullYear();
-  const total = PAY_PERIODS[frequency] || 26;
-  const dayOfYear = Math.floor(
-    (now.getTime() - new Date(year, 0, 0).getTime()) / 86400000
-  );
-  const fraction = dayOfYear / 365;
-  return Math.max(0, Math.round(total * (1 - fraction)));
-}
-
 // Compute how many pay periods occur between start of year and a given date
 function payPeriodsUpToDate(date: string, frequency: string): number {
   const total = PAY_PERIODS[frequency] || 26;
@@ -37,22 +26,29 @@ function payPeriodsUpToDate(date: string, frequency: string): number {
   return Math.floor(total * (dayOfYear / 365));
 }
 
+const DEFAULT_SETTINGS: UserSettings = {
+  user_id: 0,
+  accrual_rate: 0,
+  current_hours: 0,
+  sick_days: 0,
+  buffer_days: 0,
+  hours_per_day: 8,
+  max_accrual: 0,
+  pay_frequency: 'biweekly',
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [settings, setSettings] = useState<UserSettings>({
-    user_id: 0,
-    accrual_rate: 0,
-    current_days: 0,
-    sick_days: 0,
-    buffer_days: 0,
-    pay_frequency: 'biweekly',
-  });
+  const [guestMode, setGuestMode] = useState(false);
+  const [settings, setSettings] = useState<UserSettings>({ ...DEFAULT_SETTINGS });
   const [ptoDays, setPtoDays] = useState<PtoDay[]>([]);
   const [enabledRecs, setEnabledRecs] = useState<Set<string>>(new Set());
   const [year, setYear] = useState(new Date().getFullYear());
   const [saveTimeout, setSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load user data
+  const isLoggedIn = user !== null || guestMode;
+
+  // Load user data (only when logged in with account)
   useEffect(() => {
     if (!user) return;
 
@@ -75,6 +71,8 @@ export default function App() {
       const updated = { ...settings, ...partial };
       setSettings(updated);
 
+      if (guestMode) return; // Don't save in guest mode
+
       if (saveTimeout) clearTimeout(saveTimeout);
       const t = setTimeout(() => {
         if (user) {
@@ -83,7 +81,7 @@ export default function App() {
       }, 500);
       setSaveTimeout(t);
     },
-    [settings, user, saveTimeout]
+    [settings, user, saveTimeout, guestMode]
   );
 
   // Holidays
@@ -121,83 +119,75 @@ export default function App() {
     return set;
   }, [ptoDays, year, recommendedDates]);
 
-  // PTO accumulation logic: compute which dates are over-budget
-  // Sort selected dates chronologically, track running balance
-  const { overBudgetDates, disabledDates, projectedBalance, totalAccrualThisYear } = useMemo(() => {
+  // PTO accumulation logic in HOURS with max accrual cap
+  const { overBudgetDates, disabledDates, projectedBalanceHrs, totalAccrualHrs } = useMemo(() => {
     const freq = settings.pay_frequency || 'biweekly';
-    const rate = settings.accrual_rate || 0;
+    const rateHrs = settings.accrual_rate || 0; // hours per paycheck
     const totalPeriods = PAY_PERIODS[freq] || 26;
-    const totalAccrual = rate * totalPeriods;
+    const totalAccrual = rateHrs * totalPeriods;
+    const hrsPerDay = settings.hours_per_day || 8;
+    const maxCap = settings.max_accrual || 0; // 0 = no cap
 
     const sortedDates = Array.from(selectedDaysThisYear).sort();
     const overBudget = new Set<string>();
-    const bufferReserve = settings.buffer_days || 0;
-    let balance = (settings.current_days || 0) - bufferReserve;
+    const bufferHrs = (settings.buffer_days || 0) * hrsPerDay;
+    let balanceHrs = (settings.current_hours || 0) - bufferHrs;
     let lastPeriodCount = 0;
 
     for (const date of sortedDates) {
-      // Accrue PTO up to this date
+      // Accrue hours up to this date
       const periodsNow = payPeriodsUpToDate(date, freq);
       const newPeriods = periodsNow - lastPeriodCount;
-      balance += newPeriods * rate;
+      balanceHrs += newPeriods * rateHrs;
+
+      // Apply max accrual cap
+      if (maxCap > 0 && balanceHrs > maxCap) {
+        balanceHrs = maxCap;
+      }
+
       lastPeriodCount = periodsNow;
 
-      // Use a day
-      balance -= 1;
+      // Use a day (deduct hours)
+      balanceHrs -= hrsPerDay;
 
-      if (balance < 0) {
+      if (balanceHrs < 0) {
         overBudget.add(date);
       }
     }
 
     // Projected end-of-year balance
     const periodsRemaining = totalPeriods - lastPeriodCount;
-    const projected = balance + periodsRemaining * rate;
-
-    // Disabled dates: if selecting another day would put you negative
-    // Simple heuristic: disable if current running balance (at end of year) would go negative
-    const disabled = new Set<string>();
-    if (projected < 0) {
-      // Mark all future unselected weekdays as disabled
-      const today = new Date().toISOString().split('T')[0];
-      // We won't precompute all dates - the calendar handles this via over-budget coloring
+    let projected = balanceHrs + periodsRemaining * rateHrs;
+    if (maxCap > 0 && projected > maxCap) {
+      projected = maxCap;
     }
+
+    const disabled = new Set<string>();
 
     return {
       overBudgetDates: overBudget,
       disabledDates: disabled,
-      projectedBalance: projected,
-      totalAccrualThisYear: totalAccrual,
+      projectedBalanceHrs: projected,
+      totalAccrualHrs: totalAccrual,
     };
   }, [selectedDaysThisYear, settings]);
 
   // Toggle a day
   const handleToggleDay = async (date: string) => {
-    if (!user) return;
-
-    // If it's a recommended-only day (not manually selected), add it manually
     const isManuallySelected = ptoDays.some((d) => d.date === date);
-    const isRecommended = recommendedDates.has(date);
 
     if (isManuallySelected) {
-      // Remove it
       setPtoDays((prev) => prev.filter((d) => d.date !== date));
-      await api.toggleDay(user.id, date);
-    } else if (!isRecommended || isManuallySelected) {
-      // Check if adding would put this date over budget
-      // We allow it but it will show red
-      setPtoDays((prev) => [...prev, { id: 0, user_id: user.id, date, type: 'pto' }]);
-      await api.toggleDay(user.id, date);
+      if (user) await api.toggleDay(user.id, date);
     } else {
-      // It's a recommended date - toggle it on manually so it persists
-      setPtoDays((prev) => [...prev, { id: 0, user_id: user.id, date, type: 'pto' }]);
-      await api.toggleDay(user.id, date);
+      const userId = user?.id || 0;
+      setPtoDays((prev) => [...prev, { id: 0, user_id: userId, date, type: 'pto' }]);
+      if (user) await api.toggleDay(user.id, date);
     }
   };
 
   // Toggle recommendation
   const handleToggleRec = async (key: string, enabled: boolean) => {
-    if (!user) return;
     setEnabledRecs((prev) => {
       const next = new Set(prev);
       if (enabled) next.add(key);
@@ -205,42 +195,40 @@ export default function App() {
       return next;
     });
 
-    // Add/remove the recommendation's dates from pto_days
     const rec = recommendations.find((r) => r.key === key);
     if (rec) {
       for (const date of rec.dates) {
         const exists = ptoDays.some((d) => d.date === date);
         if (enabled && !exists) {
-          setPtoDays((prev) => [...prev, { id: 0, user_id: user.id, date, type: 'pto' }]);
-          await api.toggleDay(user.id, date, 'pto');
+          const userId = user?.id || 0;
+          setPtoDays((prev) => [...prev, { id: 0, user_id: userId, date, type: 'pto' }]);
+          if (user) await api.toggleDay(user.id, date, 'pto');
         } else if (!enabled && exists) {
           setPtoDays((prev) => prev.filter((d) => d.date !== date));
-          await api.toggleDay(user.id, date, 'pto');
+          if (user) await api.toggleDay(user.id, date, 'pto');
         }
       }
     }
 
-    await api.toggleRecommendation(user.id, key, enabled);
+    if (user) await api.toggleRecommendation(user.id, key, enabled);
   };
 
   const handleLogout = () => {
     setUser(null);
-    setSettings({
-      user_id: 0,
-      accrual_rate: 0,
-      current_days: 0,
-      sick_days: 0,
-      buffer_days: 0,
-      pay_frequency: 'biweekly',
-    });
+    setGuestMode(false);
+    setSettings({ ...DEFAULT_SETTINGS });
     setPtoDays([]);
     setEnabledRecs(new Set());
   };
 
-  if (!user) {
+  const handleSkip = () => {
+    setGuestMode(true);
+  };
+
+  if (!isLoggedIn) {
     return (
       <div className="app">
-        <Login onLogin={setUser} />
+        <Login onLogin={setUser} onSkip={handleSkip} />
       </div>
     );
   }
@@ -250,9 +238,9 @@ export default function App() {
       <div className="header">
         <h1>PTO Planner</h1>
         <div className="header-right">
-          <span>{user.name}</span>
+          <span>{guestMode ? 'Guest' : user!.name}</span>
           <button className="secondary" onClick={handleLogout}>
-            Switch User
+            {guestMode ? 'Back' : 'Switch User'}
           </button>
         </div>
       </div>
@@ -260,11 +248,13 @@ export default function App() {
       <SettingsPanel settings={settings} onChange={updateSettings} />
 
       <PtoSummary
-        currentBalance={settings.current_days || 0}
+        currentBalanceHrs={settings.current_hours || 0}
         totalSelected={selectedDaysThisYear.size}
-        totalAccrualThisYear={totalAccrualThisYear}
-        projectedBalance={projectedBalance}
+        totalAccrualHrs={totalAccrualHrs}
+        projectedBalanceHrs={projectedBalanceHrs}
         sickDays={settings.sick_days || 0}
+        hoursPerDay={settings.hours_per_day || 8}
+        maxAccrual={settings.max_accrual || 0}
       />
 
       <Recommendations

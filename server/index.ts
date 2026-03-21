@@ -27,9 +27,11 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS user_settings (
     user_id INTEGER PRIMARY KEY,
     accrual_rate REAL DEFAULT 0,
-    current_days REAL DEFAULT 0,
+    current_hours REAL DEFAULT 0,
     sick_days REAL DEFAULT 0,
     buffer_days REAL DEFAULT 0,
+    hours_per_day REAL DEFAULT 8,
+    max_accrual REAL DEFAULT 0,
     pay_frequency TEXT DEFAULT 'biweekly',
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
@@ -52,12 +54,20 @@ db.exec(`
   );
 `);
 
-// Migrate: add buffer_days if missing
-try {
-  db.exec(`ALTER TABLE user_settings ADD COLUMN buffer_days REAL DEFAULT 0`);
-} catch (_) {
-  // Column already exists
+// Migrations
+const migrations = [
+  `ALTER TABLE user_settings ADD COLUMN buffer_days REAL DEFAULT 0`,
+  `ALTER TABLE user_settings ADD COLUMN hours_per_day REAL DEFAULT 8`,
+  `ALTER TABLE user_settings ADD COLUMN max_accrual REAL DEFAULT 0`,
+  `ALTER TABLE user_settings ADD COLUMN current_hours REAL DEFAULT 0`,
+];
+for (const sql of migrations) {
+  try { db.exec(sql); } catch (_) { /* column already exists */ }
 }
+// Migrate current_days -> current_hours if old column exists
+try {
+  db.exec(`UPDATE user_settings SET current_hours = current_days * 8 WHERE current_hours = 0 AND current_days > 0`);
+} catch (_) { /* current_days column may not exist */ }
 
 // Auth: simple name-based login
 app.post('/api/login', (req, res) => {
@@ -86,17 +96,19 @@ app.get('/api/users/:id/settings', (req, res) => {
 
 // Update user settings
 app.put('/api/users/:id/settings', (req, res) => {
-  const { accrual_rate, current_days, sick_days, buffer_days, pay_frequency } = req.body;
+  const { accrual_rate, current_hours, sick_days, buffer_days, hours_per_day, max_accrual, pay_frequency } = req.body;
   db.prepare(`
-    INSERT INTO user_settings (user_id, accrual_rate, current_days, sick_days, buffer_days, pay_frequency)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO user_settings (user_id, accrual_rate, current_hours, sick_days, buffer_days, hours_per_day, max_accrual, pay_frequency)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET
       accrual_rate = excluded.accrual_rate,
-      current_days = excluded.current_days,
+      current_hours = excluded.current_hours,
       sick_days = excluded.sick_days,
       buffer_days = excluded.buffer_days,
+      hours_per_day = excluded.hours_per_day,
+      max_accrual = excluded.max_accrual,
       pay_frequency = excluded.pay_frequency
-  `).run(req.params.id, accrual_rate, current_days, sick_days, buffer_days || 0, pay_frequency);
+  `).run(req.params.id, accrual_rate, current_hours || 0, sick_days, buffer_days || 0, hours_per_day || 8, max_accrual || 0, pay_frequency);
   res.json({ success: true });
 });
 

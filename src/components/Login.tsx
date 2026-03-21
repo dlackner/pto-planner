@@ -4,9 +4,10 @@ import { api } from '../api';
 
 interface Props {
   onLogin: (user: User) => void;
+  onSkip: () => void;
 }
 
-export default function Login({ onLogin }: Props) {
+export default function Login({ onLogin, onSkip }: Props) {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -39,6 +40,9 @@ export default function Login({ onLogin }: Props) {
           {loading ? '...' : 'Go'}
         </button>
       </form>
+      <button className="secondary skip-btn" onClick={onSkip}>
+        Skip -- use without saving
+      </button>
     </div>
   );
 }

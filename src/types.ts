@@ -7,9 +7,11 @@ export interface User {
 export interface UserSettings {
   user_id: number;
   accrual_rate: number;
-  current_days: number;
+  current_hours: number;
   sick_days: number;
   buffer_days: number;
+  hours_per_day: number;
+  max_accrual: number;
   pay_frequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 }
 

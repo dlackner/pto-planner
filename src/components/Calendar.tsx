@@ -70,12 +70,12 @@ export default function Calendar({
           if (isPast) className += ' weekend'; // reuse weekend styling for past dates
           else if (isWeekend) className += ' weekend';
           else if (isHoliday) className += ' holiday';
-          else if (isSelected) {
+          else if (isRecommended) {
+            className += ' recommended';
+            if (isOverBudget) className += ' over-budget';
+          } else if (isSelected) {
             className += ' selected-pto';
             if (isOverBudget) className += ' over-budget';
-          } else if (isRecommended) {
-            // Only blue if recommended but NOT selected/toggled on
-            className += ' recommended';
           }
           if (isDisabled && !isSelected) className += ' disabled';
           if (isToday) className += ' today';

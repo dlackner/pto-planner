@@ -7,6 +7,17 @@ interface Props {
   onToggle: (key: string, enabled: boolean) => void;
 }
 
+function formatShortDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return `${m}/${d}/${String(y).slice(2)}`;
+}
+
+function dateRange(dates: string[]): string {
+  if (dates.length === 0) return '';
+  const sorted = [...dates].sort();
+  return `[${formatShortDate(sorted[0])} - ${formatShortDate(sorted[sorted.length - 1])}]`;
+}
+
 export default function Recommendations({ recommendations, enabled, onToggle }: Props) {
   if (recommendations.length === 0) return null;
 
@@ -16,7 +27,7 @@ export default function Recommendations({ recommendations, enabled, onToggle }: 
       {recommendations.map((rec) => (
         <div key={rec.key} className="rec-item">
           <div className="rec-info">
-            <div className="rec-label">{rec.label}</div>
+            <div className="rec-label">{rec.label} <span className="rec-dates">{dateRange(rec.dates)}</span></div>
             <div className="rec-desc">{rec.description}</div>
           </div>
           <label className="toggle">

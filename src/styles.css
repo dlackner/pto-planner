@@ -265,6 +265,12 @@ button.secondary:hover {
   font-weight: 500;
 }
 
+.rec-dates {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
 .rec-desc {
   font-size: 0.75rem;
   color: var(--text-secondary);

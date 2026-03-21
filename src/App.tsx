@@ -40,7 +40,14 @@ const DEFAULT_SETTINGS: UserSettings = {
   anniversary: '',
 };
 
+function getInitialTheme(): 'light' | 'dark' {
+  const saved = localStorage.getItem('pto-theme');
+  if (saved === 'dark' || saved === 'light') return saved;
+  return 'light';
+}
+
 export default function App() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(getInitialTheme);
   const [user, setUser] = useState<User | null>(null);
   const [guestMode, setGuestMode] = useState(false);
   const [settings, setSettings] = useState<UserSettings>({ ...DEFAULT_SETTINGS });
@@ -48,6 +55,16 @@ export default function App() {
   const [enabledRecs, setEnabledRecs] = useState<Set<string>>(new Set());
   const [year, setYear] = useState(new Date().getFullYear());
   const [saveTimeout, setSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('pto-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(t => t === 'light' ? 'dark' : 'light');
+  }, []);
 
   const isLoggedIn = user !== null || guestMode;
 
@@ -290,7 +307,7 @@ export default function App() {
   if (!isLoggedIn) {
     return (
       <div className="app">
-        <Login onLogin={setUser} onSkip={handleSkip} />
+        <Login onLogin={setUser} onSkip={handleSkip} theme={theme} onToggleTheme={toggleTheme} />
       </div>
     );
   }
@@ -300,6 +317,9 @@ export default function App() {
       <div className="header">
         <h1>PTO Planner</h1>
         <div className="header-right">
+          <button className="theme-toggle-btn" onClick={toggleTheme}>
+            {theme === 'light' ? 'Dark' : 'Light'}
+          </button>
           <span>{guestMode ? 'Guest' : user!.name}</span>
           <button className="secondary" onClick={handleLogout}>
             {guestMode ? 'Back' : 'Switch User'}

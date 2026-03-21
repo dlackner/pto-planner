@@ -5,9 +5,11 @@ import { api } from '../api';
 interface Props {
   onLogin: (user: User) => void;
   onSkip: () => void;
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
 }
 
-export default function Login({ onLogin, onSkip }: Props) {
+export default function Login({ onLogin, onSkip, theme, onToggleTheme }: Props) {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +29,9 @@ export default function Login({ onLogin, onSkip }: Props) {
 
   return (
     <div className="login-page">
+      <button className="theme-toggle-btn" onClick={onToggleTheme}>
+        {theme === 'light' ? 'Dark' : 'Light'}
+      </button>
       <h1>PTO Planner</h1>
       <form onSubmit={handleSubmit}>
         <input

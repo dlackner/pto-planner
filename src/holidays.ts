@@ -288,5 +288,13 @@ export function getRecommendations(
     }
   }
 
-  return recommendations;
+  // Filter out past dates from recommendations
+  const now = new Date();
+  const todayStr = formatDate(now);
+  return recommendations
+    .map(rec => ({
+      ...rec,
+      dates: rec.dates.filter(d => d >= todayStr),
+    }))
+    .filter(rec => rec.dates.length > 0);
 }

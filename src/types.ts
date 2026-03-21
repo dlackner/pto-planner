@@ -9,6 +9,7 @@ export interface UserSettings {
   accrual_rate: number;
   current_days: number;
   sick_days: number;
+  buffer_days: number;
   pay_frequency: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 }
 

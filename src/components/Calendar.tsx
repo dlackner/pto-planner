@@ -64,6 +64,7 @@ export default function Calendar({
             className += ' selected-pto';
             if (isOverBudget) className += ' over-budget';
           } else if (isRecommended) {
+            // Only blue if recommended but NOT selected/toggled on
             className += ' recommended';
           }
           if (isDisabled && !isSelected) className += ' disabled';
@@ -83,11 +84,11 @@ export default function Calendar({
               className={className}
               title={title}
               onClick={() => {
-                if (!isWeekend && !isHoliday && !isDisabled) {
-                  onToggleDay(dateStr);
-                }
-                // Allow deselecting even if disabled
+                if (isWeekend || isHoliday) return;
                 if (isSelected) {
+                  // Always allow deselecting
+                  onToggleDay(dateStr);
+                } else if (!isDisabled) {
                   onToggleDay(dateStr);
                 }
               }}

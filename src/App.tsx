@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, UserSettings, PtoDay } from './types';
 import { api } from './api';
 import { getObservedHolidays, getRecommendations } from './holidays';
+import { downloadICS } from './ics';
 import Login from './components/Login';
 import SettingsPanel from './components/SettingsPanel';
 import PtoSummary from './components/PtoSummary';
@@ -43,6 +44,7 @@ export default function App() {
     accrual_rate: 0,
     current_days: 0,
     sick_days: 0,
+    buffer_days: 0,
     pay_frequency: 'biweekly',
   });
   const [ptoDays, setPtoDays] = useState<PtoDay[]>([]);
@@ -129,7 +131,8 @@ export default function App() {
 
     const sortedDates = Array.from(selectedDaysThisYear).sort();
     const overBudget = new Set<string>();
-    let balance = settings.current_days || 0;
+    const bufferReserve = settings.buffer_days || 0;
+    let balance = (settings.current_days || 0) - bufferReserve;
     let lastPeriodCount = 0;
 
     for (const date of sortedDates) {
@@ -227,6 +230,7 @@ export default function App() {
       accrual_rate: 0,
       current_days: 0,
       sick_days: 0,
+      buffer_days: 0,
       pay_frequency: 'biweekly',
     });
     setPtoDays([]);
@@ -296,6 +300,19 @@ export default function App() {
         <button className="secondary" onClick={() => setYear((y) => y + 1)}>
           Next
         </button>
+        {selectedDaysThisYear.size > 0 && (
+          <button
+            className="secondary export-btn"
+            onClick={() =>
+              downloadICS(
+                Array.from(selectedDaysThisYear),
+                `pto-${year}.ics`
+              )
+            }
+          >
+            Export to Calendar
+          </button>
+        )}
       </div>
 
       <Calendar

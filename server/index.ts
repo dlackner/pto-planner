@@ -29,6 +29,7 @@ db.exec(`
     accrual_rate REAL DEFAULT 0,
     current_days REAL DEFAULT 0,
     sick_days REAL DEFAULT 0,
+    buffer_days REAL DEFAULT 0,
     pay_frequency TEXT DEFAULT 'biweekly',
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
@@ -50,6 +51,13 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `);
+
+// Migrate: add buffer_days if missing
+try {
+  db.exec(`ALTER TABLE user_settings ADD COLUMN buffer_days REAL DEFAULT 0`);
+} catch (_) {
+  // Column already exists
+}
 
 // Auth: simple name-based login
 app.post('/api/login', (req, res) => {
@@ -78,16 +86,17 @@ app.get('/api/users/:id/settings', (req, res) => {
 
 // Update user settings
 app.put('/api/users/:id/settings', (req, res) => {
-  const { accrual_rate, current_days, sick_days, pay_frequency } = req.body;
+  const { accrual_rate, current_days, sick_days, buffer_days, pay_frequency } = req.body;
   db.prepare(`
-    INSERT INTO user_settings (user_id, accrual_rate, current_days, sick_days, pay_frequency)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO user_settings (user_id, accrual_rate, current_days, sick_days, buffer_days, pay_frequency)
+    VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET
       accrual_rate = excluded.accrual_rate,
       current_days = excluded.current_days,
       sick_days = excluded.sick_days,
+      buffer_days = excluded.buffer_days,
       pay_frequency = excluded.pay_frequency
-  `).run(req.params.id, accrual_rate, current_days, sick_days, pay_frequency);
+  `).run(req.params.id, accrual_rate, current_days, sick_days, buffer_days || 0, pay_frequency);
   res.json({ success: true });
 });
 

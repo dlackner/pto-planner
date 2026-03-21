@@ -21,6 +21,11 @@
   --holiday-light: #ede9fe;
 }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
@@ -33,6 +38,7 @@ body {
   max-width: 1000px;
   margin: 0 auto;
   padding: 1.5rem 1rem;
+  overflow-x: hidden;
 }
 
 /* Login page */

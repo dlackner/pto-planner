@@ -114,6 +114,39 @@ export default function App() {
     return dates;
   }, [recommendations, enabledRecs]);
 
+  // Map of date -> recommendation label for calendar labels
+  const recommendedNames = useMemo(() => {
+    const names = new Map<string, string>();
+    for (const rec of recommendations) {
+      if (enabledRecs.has(rec.key)) {
+        for (const d of rec.dates) {
+          if (!names.has(d)) names.set(d, rec.label);
+        }
+      }
+    }
+    return names;
+  }, [recommendations, enabledRecs]);
+
+  // Dates already covered by enabled recommendations (for hiding overlapping recs)
+  const coveredDates = useMemo(() => {
+    const covered = new Set<string>();
+    for (const rec of recommendations) {
+      if (enabledRecs.has(rec.key)) {
+        rec.dates.forEach(d => covered.add(d));
+      }
+    }
+    return covered;
+  }, [recommendations, enabledRecs]);
+
+  // Filter recommendations: hide ones whose dates are fully covered by already-enabled recs
+  const visibleRecommendations = useMemo(() => {
+    return recommendations.filter(rec => {
+      if (enabledRecs.has(rec.key)) return true; // always show enabled ones
+      // Hide if all dates are already covered
+      return rec.dates.some(d => !coveredDates.has(d));
+    });
+  }, [recommendations, enabledRecs, coveredDates]);
+
   // Manually selected PTO days for current year (not including recommendations)
   const selectedDaysThisYear = useMemo(() => {
     const set = new Set<string>();
@@ -201,6 +234,20 @@ export default function App() {
     }
   };
 
+  // Toggle multiple days at once (for drag-to-select)
+  const handleToggleDays = async (dates: string[]) => {
+    const userId = user?.id || 0;
+    for (const date of dates) {
+      const isManuallySelected = ptoDays.some((d) => d.date === date);
+      if (isManuallySelected) {
+        setPtoDays((prev) => prev.filter((d) => d.date !== date));
+      } else {
+        setPtoDays((prev) => [...prev, { id: 0, user_id: userId, date, type: 'pto' }]);
+      }
+      if (user) await api.toggleDay(user.id, date);
+    }
+  };
+
   // Toggle recommendation
   const handleToggleRec = async (key: string, enabled: boolean) => {
     setEnabledRecs((prev) => {
@@ -272,7 +319,7 @@ export default function App() {
       />
 
       <Recommendations
-        recommendations={recommendations}
+        recommendations={visibleRecommendations}
         enabled={enabledRecs}
         onToggle={handleToggleRec}
       />
@@ -329,9 +376,11 @@ export default function App() {
         holidayDates={holidayDates}
         holidayNames={holidayNames}
         recommendedDates={recommendedDates}
+        recommendedNames={recommendedNames}
         overBudgetDates={overBudgetDates}
         disabledDates={disabledDates}
         onToggleDay={handleToggleDay}
+        onToggleDays={handleToggleDays}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 
 interface Props {
   year: number;
@@ -6,9 +6,11 @@ interface Props {
   holidayDates: Set<string>;
   holidayNames: Map<string, string>;
   recommendedDates: Set<string>;
+  recommendedNames: Map<string, string>;
   overBudgetDates: Set<string>;
   disabledDates: Set<string>;
   onToggleDay: (date: string) => void;
+  onToggleDays: (dates: string[]) => void;
 }
 
 const MONTHS = [
@@ -28,14 +30,80 @@ export default function Calendar({
   holidayDates,
   holidayNames,
   recommendedDates,
+  recommendedNames,
   overBudgetDates,
   disabledDates,
   onToggleDay,
+  onToggleDays,
 }: Props) {
   const now = new Date();
   const today = formatDate(now.getFullYear(), now.getMonth(), now.getDate());
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
+
+  // Drag-to-select state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragMode, setDragMode] = useState<'select' | 'deselect'>('select');
+  const [dragDates, setDragDates] = useState<Set<string>>(new Set());
+  const dragRef = useRef(false);
+
+  const canSelect = useCallback((dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dow = new Date(y, m - 1, d).getDay();
+    const isWeekend = dow === 0 || dow === 6;
+    const isPast = dateStr < today;
+    return !isPast && !isWeekend && !holidayDates.has(dateStr) && !disabledDates.has(dateStr);
+  }, [today, holidayDates, disabledDates]);
+
+  const handleMouseDown = useCallback((dateStr: string) => {
+    if (!canSelect(dateStr)) return;
+    const isCurrentlySelected = selectedDays.has(dateStr) || recommendedDates.has(dateStr);
+    const mode = isCurrentlySelected ? 'deselect' : 'select';
+    setDragMode(mode);
+    setIsDragging(true);
+    dragRef.current = true;
+    setDragDates(new Set([dateStr]));
+  }, [canSelect, selectedDays, recommendedDates]);
+
+  const handleMouseEnter = useCallback((dateStr: string) => {
+    if (!dragRef.current) return;
+    if (!canSelect(dateStr)) return;
+    setDragDates(prev => {
+      const next = new Set(prev);
+      next.add(dateStr);
+      return next;
+    });
+  }, [canSelect]);
+
+  const handleMouseUp = useCallback(() => {
+    if (!dragRef.current) return;
+    dragRef.current = false;
+    setIsDragging(false);
+
+    const dates = Array.from(dragDates);
+    if (dates.length === 1) {
+      onToggleDay(dates[0]);
+    } else if (dates.length > 1) {
+      // For multi-select, filter based on drag mode
+      if (dragMode === 'select') {
+        const toSelect = dates.filter(d => !selectedDays.has(d) && !recommendedDates.has(d));
+        if (toSelect.length > 0) onToggleDays(toSelect);
+      } else {
+        const toDeselect = dates.filter(d => selectedDays.has(d));
+        if (toDeselect.length > 0) onToggleDays(toDeselect);
+      }
+    }
+    setDragDates(new Set());
+  }, [dragDates, dragMode, selectedDays, recommendedDates, onToggleDay, onToggleDays]);
+
+  // Global mouseup listener
+  React.useEffect(() => {
+    const onUp = () => {
+      if (dragRef.current) handleMouseUp();
+    };
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, [handleMouseUp]);
 
   // Filter to only show current month onward (for current year) or all months (future years)
   const visibleMonths = MONTHS
@@ -65,9 +133,10 @@ export default function Calendar({
           const isDisabled = disabledDates.has(dateStr);
           const isToday = dateStr === today;
           const isPast = dateStr < today;
+          const isDragTarget = isDragging && dragDates.has(dateStr);
 
           let className = 'day-cell';
-          if (isPast) className += ' weekend'; // reuse weekend styling for past dates
+          if (isPast) className += ' weekend';
           else if (isWeekend) className += ' weekend';
           else if (isHoliday) className += ' holiday';
           else if (isRecommended) {
@@ -79,13 +148,24 @@ export default function Calendar({
           }
           if (isDisabled && !isSelected) className += ' disabled';
           if (isToday) className += ' today';
+          if (isDragTarget && !isPast && !isWeekend && !isHoliday) {
+            className += dragMode === 'select' ? ' drag-select' : ' drag-deselect';
+          }
+
+          // Label for holiday or suggested day
+          let label: string | undefined;
+          if (isHoliday) {
+            label = holidayNames.get(dateStr);
+          } else if (isRecommended) {
+            label = recommendedNames.get(dateStr);
+          }
 
           const title = isHoliday
             ? holidayNames.get(dateStr) || 'Holiday'
             : isSelected && isOverBudget
             ? 'Over budget'
             : isRecommended
-            ? 'Suggested day off'
+            ? recommendedNames.get(dateStr) || 'Suggested day off'
             : undefined;
 
           cells.push(
@@ -93,17 +173,14 @@ export default function Calendar({
               key={day}
               className={className}
               title={title}
-              onClick={() => {
-                if (isPast || isWeekend || isHoliday) return;
-                if (isSelected) {
-                  // Always allow deselecting
-                  onToggleDay(dateStr);
-                } else if (!isDisabled) {
-                  onToggleDay(dateStr);
-                }
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleMouseDown(dateStr);
               }}
+              onMouseEnter={() => handleMouseEnter(dateStr)}
             >
-              {day}
+              <span className="day-number">{day}</span>
+              {label && <span className="day-label">{label}</span>}
             </div>
           );
         }

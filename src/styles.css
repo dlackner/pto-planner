@@ -17,8 +17,8 @@
   --red-light: #fee2e2;
   --blue: #3b82f6;
   --blue-light: #dbeafe;
-  --holiday: #9a3412;
-  --holiday-light: #ffedd5;
+  --holiday: #4c1d95;
+  --holiday-light: #ede9fe;
 }
 
 body {
@@ -397,6 +397,7 @@ button.secondary:hover {
 .day-cell {
   aspect-ratio: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
@@ -405,6 +406,25 @@ button.secondary:hover {
   transition: all 0.1s;
   user-select: none;
   position: relative;
+  overflow: hidden;
+}
+
+.day-number {
+  line-height: 1;
+}
+
+.day-label {
+  font-size: 0.375rem;
+  line-height: 1;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 1px;
+  opacity: 0.85;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .day-cell:hover {
@@ -480,6 +500,18 @@ button.secondary:hover {
 
 .day-cell.disabled:hover {
   outline: none;
+}
+
+.day-cell.drag-select {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+  background: var(--green-light);
+}
+
+.day-cell.drag-deselect {
+  outline: 2px dashed var(--red);
+  outline-offset: -2px;
+  opacity: 0.6;
 }
 
 /* Legend */

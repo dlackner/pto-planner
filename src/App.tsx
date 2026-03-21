@@ -19,7 +19,8 @@ const PAY_PERIODS: Record<string, number> = {
 // Compute how many pay periods occur between start of year and a given date
 function payPeriodsUpToDate(date: string, frequency: string): number {
   const total = PAY_PERIODS[frequency] || 26;
-  const d = new Date(date);
+  const [y, m, day] = date.split('-').map(Number);
+  const d = new Date(y, m - 1, day);
   const year = d.getFullYear();
   const start = new Date(year, 0, 1);
   const dayOfYear = Math.floor((d.getTime() - start.getTime()) / 86400000);

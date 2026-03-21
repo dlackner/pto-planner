@@ -47,6 +47,12 @@ function formatDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// Parse YYYY-MM-DD as local time (not UTC)
+function parseDate(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function observedDate(year: number, month: number, day: number): string {
   const d = new Date(year, month, day);
   const dow = d.getDay();
@@ -109,7 +115,7 @@ export function getRecommendations(
   {
     const thanksgivingDate = holidays.find(h => h.name === 'Thanksgiving')?.date;
     if (thanksgivingDate) {
-      const tg = new Date(thanksgivingDate);
+      const tg = parseDate(thanksgivingDate);
       const dates: string[] = [];
       // Day after Thanksgiving (Friday)
       const fri = new Date(tg);
@@ -135,7 +141,7 @@ export function getRecommendations(
 
   // Bridge days: suggest extending any holiday into a long weekend
   for (const holiday of holidays) {
-    const hd = new Date(holiday.date);
+    const hd = parseDate(holiday.date);
     const dow = hd.getDay();
 
     if (dow === 1) {
@@ -224,7 +230,7 @@ export function getRecommendations(
   {
     const july4 = holidays.find(h => h.name === 'Independence Day')?.date;
     if (july4) {
-      const j4 = new Date(july4);
+      const j4 = parseDate(july4);
       const dates: string[] = [];
       // Check Mon-Fri of the same week
       const dayOfWeek = j4.getDay();

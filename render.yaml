@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: pto-planner
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /opt/render/project/data/pto.db
+    disk:
+      name: pto-data
+      mountPath: /opt/render/project/data
+      sizeGB: 1

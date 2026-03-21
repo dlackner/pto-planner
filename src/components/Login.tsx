@@ -1,0 +1,44 @@
+import React, { useState } from 'react';
+import { User } from '../types';
+import { api } from '../api';
+
+interface Props {
+  onLogin: (user: User) => void;
+}
+
+export default function Login({ onLogin }: Props) {
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setLoading(true);
+    try {
+      const { user } = await api.login(name.trim());
+      onLogin(user);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="login-page">
+      <h1>PTO Planner</h1>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          placeholder="Your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+        />
+        <button type="submit" disabled={loading}>
+          {loading ? '...' : 'Go'}
+        </button>
+      </form>
+    </div>
+  );
+}

@@ -45,7 +45,7 @@ const DEFAULT_SETTINGS: UserSettings = {
 function getInitialTheme(): 'light' | 'dark' {
   const saved = localStorage.getItem('pto-theme');
   if (saved === 'dark' || saved === 'light') return saved;
-  return 'light';
+  return 'dark';
 }
 
 export default function App() {

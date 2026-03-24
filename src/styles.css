@@ -129,7 +129,7 @@ body {
 button {
   padding: 0.625rem 1rem;
   background: var(--accent);
-  color: white;
+  color: var(--bg);
   border: none;
   border-radius: 6px;
   font-size: 0.875rem;

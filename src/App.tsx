@@ -8,6 +8,7 @@ import SettingsPanel from './components/SettingsPanel';
 import PtoSummary from './components/PtoSummary';
 import Recommendations from './components/Recommendations';
 import Calendar from './components/Calendar';
+import Instructions from './components/Instructions';
 
 const PAY_PERIODS: Record<string, number> = {
   weekly: 52,
@@ -51,6 +52,7 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(getInitialTheme);
   const [user, setUser] = useState<User | null>(null);
   const [guestMode, setGuestMode] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
   const [settings, setSettings] = useState<UserSettings>({ ...DEFAULT_SETTINGS });
   const [ptoDays, setPtoDays] = useState<PtoDay[]>([]);
   const [enabledRecs, setEnabledRecs] = useState<Set<string>>(new Set());
@@ -358,14 +360,36 @@ export default function App() {
     setEnabledRecs(new Set());
   };
 
+  const shouldShowInstructions = () => {
+    return localStorage.getItem('pto-skip-instructions') !== '1';
+  };
+
+  const handleLogin = (u: User) => {
+    setUser(u);
+    if (shouldShowInstructions()) {
+      setShowInstructions(true);
+    }
+  };
+
   const handleSkip = () => {
     setGuestMode(true);
+    if (shouldShowInstructions()) {
+      setShowInstructions(true);
+    }
   };
 
   if (!isLoggedIn) {
     return (
       <div className="app">
-        <Login onLogin={setUser} onSkip={handleSkip} theme={theme} onToggleTheme={toggleTheme} />
+        <Login onLogin={handleLogin} onSkip={handleSkip} theme={theme} onToggleTheme={toggleTheme} />
+      </div>
+    );
+  }
+
+  if (showInstructions) {
+    return (
+      <div className="app">
+        <Instructions onContinue={() => setShowInstructions(false)} />
       </div>
     );
   }

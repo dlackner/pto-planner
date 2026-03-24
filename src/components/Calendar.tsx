@@ -60,6 +60,10 @@ export default function Calendar({
   const [dragDates, setDragDates] = useState<Set<string>>(new Set());
   const dragRef = useRef(false);
 
+  // Long-press state for mobile inspector
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
+
   const canSelect = useCallback((dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
     const dow = new Date(y, m - 1, d).getDay();
@@ -207,13 +211,37 @@ export default function Calendar({
                 title={title}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  handleMouseDown(dateStr);
+                  if (e.button === 0) handleMouseDown(dateStr);
                 }}
                 onMouseEnter={() => handleMouseEnter(dateStr)}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   if (!isPast && !isWeekend) {
                     setInspectedDate(prev => prev === dateStr ? null : dateStr);
+                  }
+                }}
+                onTouchStart={() => {
+                  longPressTriggered.current = false;
+                  longPressTimer.current = setTimeout(() => {
+                    longPressTriggered.current = true;
+                    if (!isPast && !isWeekend) {
+                      setInspectedDate(prev => prev === dateStr ? null : dateStr);
+                    }
+                  }, 500);
+                }}
+                onTouchEnd={(e) => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
+                  }
+                  if (longPressTriggered.current) {
+                    e.preventDefault();
+                  }
+                }}
+                onTouchMove={() => {
+                  if (longPressTimer.current) {
+                    clearTimeout(longPressTimer.current);
+                    longPressTimer.current = null;
                   }
                 }}
               >

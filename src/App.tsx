@@ -16,15 +16,16 @@ const PAY_PERIODS: Record<string, number> = {
   monthly: 12,
 };
 
-// Compute how many pay periods occur between start of year and a given date
-function payPeriodsUpToDate(date: string, frequency: string): number {
+// Compute how many pay periods occur between two dates
+function payPeriodsBetween(fromDate: Date, toDate: Date, frequency: string): number {
   const total = PAY_PERIODS[frequency] || 26;
-  const [y, m, day] = date.split('-').map(Number);
-  const d = new Date(y, m - 1, day);
-  const year = d.getFullYear();
-  const start = new Date(year, 0, 1);
-  const dayOfYear = Math.floor((d.getTime() - start.getTime()) / 86400000);
-  return Math.floor(total * (dayOfYear / 365));
+  const year = fromDate.getFullYear();
+  const daysInYear = new Date(year, 1, 29).getMonth() === 1 ? 366 : 365;
+  const startDay = Math.floor((fromDate.getTime() - new Date(year, 0, 1).getTime()) / 86400000);
+  const endDay = Math.floor((toDate.getTime() - new Date(year, 0, 1).getTime()) / 86400000);
+  const periodsAtStart = Math.floor(total * (startDay / daysInYear));
+  const periodsAtEnd = Math.floor(total * (endDay / daysInYear));
+  return Math.max(0, periodsAtEnd - periodsAtStart);
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -185,24 +186,34 @@ export default function App() {
   }, [selectedDaysThisYear, recommendedDates]);
 
   // PTO accumulation logic in HOURS with max accrual cap
-  const { overBudgetDates, disabledDates, projectedBalanceHrs, totalAccrualHrs } = useMemo(() => {
+  // current_hours = user's balance RIGHT NOW. We accrue forward from today.
+  const { overBudgetDates, disabledDates, projectedBalanceHrs, totalAccrualHrs, balanceAtDate } = useMemo(() => {
     const freq = settings.pay_frequency || 'biweekly';
     const rateHrs = settings.accrual_rate || 0; // hours per paycheck
     const totalPeriods = PAY_PERIODS[freq] || 26;
     const totalAccrual = rateHrs * totalPeriods;
     const hrsPerDay = settings.hours_per_day || 8;
     const maxCap = settings.max_accrual || 0; // 0 = no cap
-
-    const sortedDates = Array.from(allPlannedDays).sort();
-    const overBudget = new Set<string>();
     const bufferHrs = (settings.buffer_days || 0) * hrsPerDay;
-    let balanceHrs = (settings.current_hours || 0) - bufferHrs;
-    let lastPeriodCount = 0;
 
-    for (const date of sortedDates) {
-      // Accrue hours up to this date
-      const periodsNow = payPeriodsUpToDate(date, freq);
-      const newPeriods = periodsNow - lastPeriodCount;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    // Only process future PTO days (current_hours already reflects past usage)
+    const futureDates = Array.from(allPlannedDays).filter(d => d >= todayStr).sort();
+    const overBudget = new Set<string>();
+    const balances = new Map<string, number>(); // date -> balance AFTER using that day
+
+    let balanceHrs = (settings.current_hours || 0) - bufferHrs;
+    let lastDate = today;
+
+    for (const date of futureDates) {
+      const [y, m, d] = date.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+
+      // Accrue hours from last checkpoint to this date
+      const newPeriods = payPeriodsBetween(lastDate, dateObj, freq);
       balanceHrs += newPeriods * rateHrs;
 
       // Apply max accrual cap
@@ -210,19 +221,22 @@ export default function App() {
         balanceHrs = maxCap;
       }
 
-      lastPeriodCount = periodsNow;
+      lastDate = dateObj;
 
       // Use a day (deduct hours)
       balanceHrs -= hrsPerDay;
+
+      balances.set(date, balanceHrs);
 
       if (balanceHrs < 0) {
         overBudget.add(date);
       }
     }
 
-    // Projected end-of-year balance
-    const periodsRemaining = totalPeriods - lastPeriodCount;
-    let projected = balanceHrs + periodsRemaining * rateHrs;
+    // Projected end-of-year balance: accrue from last PTO day (or today) to Dec 31
+    const eoy = new Date(year, 11, 31);
+    const remainingPeriods = payPeriodsBetween(lastDate, eoy, freq);
+    let projected = balanceHrs + remainingPeriods * rateHrs;
     if (maxCap > 0 && projected > maxCap) {
       projected = maxCap;
     }
@@ -234,8 +248,52 @@ export default function App() {
       disabledDates: disabled,
       projectedBalanceHrs: projected,
       totalAccrualHrs: totalAccrual,
+      balanceAtDate: balances,
     };
-  }, [allPlannedDays, settings]);
+  }, [allPlannedDays, settings, year]);
+
+  // Compute balance at any given date (accrual up to that date, minus PTO taken before it)
+  const getBalanceAtDate = useCallback((targetDate: string): number => {
+    const freq = settings.pay_frequency || 'biweekly';
+    const rateHrs = settings.accrual_rate || 0;
+    const hrsPerDay = settings.hours_per_day || 8;
+    const maxCap = settings.max_accrual || 0;
+    const bufferHrs = (settings.buffer_days || 0) * hrsPerDay;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    if (targetDate < todayStr) return 0; // past dates not meaningful
+
+    const [ty, tm, td] = targetDate.split('-').map(Number);
+    const targetObj = new Date(ty, tm - 1, td);
+
+    // Get all PTO days before or on the target date (future only)
+    const ptoBefore = Array.from(allPlannedDays).filter(d => d >= todayStr && d <= targetDate).sort();
+
+    let balanceHrs = (settings.current_hours || 0) - bufferHrs;
+    let lastDate = today;
+
+    for (const date of ptoBefore) {
+      const [y, m, d] = date.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      const newPeriods = payPeriodsBetween(lastDate, dateObj, freq);
+      balanceHrs += newPeriods * rateHrs;
+      if (maxCap > 0 && balanceHrs > maxCap) balanceHrs = maxCap;
+      lastDate = dateObj;
+      balanceHrs -= hrsPerDay;
+    }
+
+    // Accrue remaining periods from last PTO day to target date
+    if (lastDate < targetObj) {
+      const remainingPeriods = payPeriodsBetween(lastDate, targetObj, freq);
+      balanceHrs += remainingPeriods * rateHrs;
+      if (maxCap > 0 && balanceHrs > maxCap) balanceHrs = maxCap;
+    }
+
+    return balanceHrs;
+  }, [settings, allPlannedDays]);
 
   // Toggle a day
   const handleToggleDay = async (date: string) => {
@@ -401,6 +459,8 @@ export default function App() {
         disabledDates={disabledDates}
         onToggleDay={handleToggleDay}
         onToggleDays={handleToggleDays}
+        getBalanceAtDate={getBalanceAtDate}
+        hoursPerDay={settings.hours_per_day || 8}
       />
     </div>
   );

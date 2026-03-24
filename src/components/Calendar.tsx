@@ -11,6 +11,8 @@ interface Props {
   disabledDates: Set<string>;
   onToggleDay: (date: string) => void;
   onToggleDays: (dates: string[]) => void;
+  getBalanceAtDate: (date: string) => number;
+  hoursPerDay: number;
 }
 
 const MONTHS = [
@@ -24,6 +26,12 @@ function formatDate(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+function formatDisplayDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 export default function Calendar({
   year,
   selectedDays,
@@ -35,11 +43,16 @@ export default function Calendar({
   disabledDates,
   onToggleDay,
   onToggleDays,
+  getBalanceAtDate,
+  hoursPerDay,
 }: Props) {
   const now = new Date();
   const today = formatDate(now.getFullYear(), now.getMonth(), now.getDate());
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
+
+  // Inspected date (right-click or long-press to inspect balance)
+  const [inspectedDate, setInspectedDate] = useState<string | null>(null);
 
   // Drag-to-select state
   const [isDragging, setIsDragging] = useState(false);
@@ -84,7 +97,6 @@ export default function Calendar({
     if (dates.length === 1) {
       onToggleDay(dates[0]);
     } else if (dates.length > 1) {
-      // For multi-select, filter based on drag mode
       if (dragMode === 'select') {
         const toSelect = dates.filter(d => !selectedDays.has(d) && !recommendedDates.has(d));
         if (toSelect.length > 0) onToggleDays(toSelect);
@@ -111,92 +123,119 @@ export default function Calendar({
     .filter(({ idx }) => year > currentYear || idx >= currentMonth);
 
   return (
-    <div className="calendar-grid">
-      {visibleMonths.map(({ name: monthName, idx: monthIdx }) => {
-        const firstDay = new Date(year, monthIdx, 1).getDay();
-        const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-        const cells: React.ReactNode[] = [];
+    <>
+      {inspectedDate && inspectedDate >= today && (
+        <div className="balance-inspector">
+          <div className="balance-inspector-content">
+            <span className="balance-inspector-date">{formatDisplayDate(inspectedDate)}</span>
+            <span className="balance-inspector-balance">
+              {(() => {
+                const bal = getBalanceAtDate(inspectedDate);
+                const days = hoursPerDay > 0 ? bal / hoursPerDay : 0;
+                return `Balance: ${bal.toFixed(1)}h / ${days.toFixed(1)}d`;
+              })()}
+            </span>
+          </div>
+          <button className="balance-inspector-close" onClick={() => setInspectedDate(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+      <div className="calendar-grid">
+        {visibleMonths.map(({ name: monthName, idx: monthIdx }) => {
+          const firstDay = new Date(year, monthIdx, 1).getDay();
+          const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+          const cells: React.ReactNode[] = [];
 
-        // Empty cells for days before the 1st
-        for (let i = 0; i < firstDay; i++) {
-          cells.push(<div key={`empty-${i}`} className="day-cell empty" />);
-        }
-
-        for (let day = 1; day <= daysInMonth; day++) {
-          const dateStr = formatDate(year, monthIdx, day);
-          const dow = new Date(year, monthIdx, day).getDay();
-          const isWeekend = dow === 0 || dow === 6;
-          const isHoliday = holidayDates.has(dateStr);
-          const isSelected = selectedDays.has(dateStr);
-          const isRecommended = recommendedDates.has(dateStr);
-          const isOverBudget = overBudgetDates.has(dateStr);
-          const isDisabled = disabledDates.has(dateStr);
-          const isToday = dateStr === today;
-          const isPast = dateStr < today;
-          const isDragTarget = isDragging && dragDates.has(dateStr);
-
-          let className = 'day-cell';
-          if (isPast) className += ' weekend';
-          else if (isWeekend) className += ' weekend';
-          else if (isHoliday) className += ' holiday';
-          else if (isRecommended) {
-            className += ' recommended';
-            if (isOverBudget) className += ' over-budget';
-          } else if (isSelected) {
-            className += ' selected-pto';
-            if (isOverBudget) className += ' over-budget';
-          }
-          if (isDisabled && !isSelected) className += ' disabled';
-          if (isToday) className += ' today';
-          if (isDragTarget && !isPast && !isWeekend && !isHoliday) {
-            className += dragMode === 'select' ? ' drag-select' : ' drag-deselect';
+          // Empty cells for days before the 1st
+          for (let i = 0; i < firstDay; i++) {
+            cells.push(<div key={`empty-${i}`} className="day-cell empty" />);
           }
 
-          // Label for holiday or suggested day
-          let label: string | undefined;
-          if (isHoliday) {
-            label = holidayNames.get(dateStr);
-          } else if (isRecommended) {
-            label = recommendedNames.get(dateStr);
+          for (let day = 1; day <= daysInMonth; day++) {
+            const dateStr = formatDate(year, monthIdx, day);
+            const dow = new Date(year, monthIdx, day).getDay();
+            const isWeekend = dow === 0 || dow === 6;
+            const isHoliday = holidayDates.has(dateStr);
+            const isSelected = selectedDays.has(dateStr);
+            const isRecommended = recommendedDates.has(dateStr);
+            const isOverBudget = overBudgetDates.has(dateStr);
+            const isDisabled = disabledDates.has(dateStr);
+            const isToday = dateStr === today;
+            const isPast = dateStr < today;
+            const isDragTarget = isDragging && dragDates.has(dateStr);
+            const isInspected = inspectedDate === dateStr;
+
+            let className = 'day-cell';
+            if (isPast) className += ' weekend';
+            else if (isWeekend) className += ' weekend';
+            else if (isHoliday) className += ' holiday';
+            else if (isRecommended) {
+              className += ' recommended';
+              if (isOverBudget) className += ' over-budget';
+            } else if (isSelected) {
+              className += ' selected-pto';
+              if (isOverBudget) className += ' over-budget';
+            }
+            if (isDisabled && !isSelected) className += ' disabled';
+            if (isToday) className += ' today';
+            if (isInspected) className += ' inspected';
+            if (isDragTarget && !isPast && !isWeekend && !isHoliday) {
+              className += dragMode === 'select' ? ' drag-select' : ' drag-deselect';
+            }
+
+            // Label for holiday or suggested day
+            let label: string | undefined;
+            if (isHoliday) {
+              label = holidayNames.get(dateStr);
+            } else if (isRecommended) {
+              label = recommendedNames.get(dateStr);
+            }
+
+            const title = isHoliday
+              ? holidayNames.get(dateStr) || 'Holiday'
+              : isSelected && isOverBudget
+              ? 'Over budget'
+              : isRecommended
+              ? recommendedNames.get(dateStr) || 'Suggested day off'
+              : undefined;
+
+            cells.push(
+              <div
+                key={day}
+                className={className}
+                title={title}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleMouseDown(dateStr);
+                }}
+                onMouseEnter={() => handleMouseEnter(dateStr)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  if (!isPast && !isWeekend) {
+                    setInspectedDate(prev => prev === dateStr ? null : dateStr);
+                  }
+                }}
+              >
+                <span className="day-number">{day}</span>
+                {label && <span className="day-label">{label}</span>}
+              </div>
+            );
           }
 
-          const title = isHoliday
-            ? holidayNames.get(dateStr) || 'Holiday'
-            : isSelected && isOverBudget
-            ? 'Over budget'
-            : isRecommended
-            ? recommendedNames.get(dateStr) || 'Suggested day off'
-            : undefined;
-
-          cells.push(
-            <div
-              key={day}
-              className={className}
-              title={title}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                handleMouseDown(dateStr);
-              }}
-              onMouseEnter={() => handleMouseEnter(dateStr)}
-            >
-              <span className="day-number">{day}</span>
-              {label && <span className="day-label">{label}</span>}
+          return (
+            <div key={monthName} className="month-card">
+              <h3>{monthName}</h3>
+              <div className="weekday-headers">
+                {WEEKDAYS.map((d) => (
+                  <span key={d}>{d}</span>
+                ))}
+              </div>
+              <div className="days-grid">{cells}</div>
             </div>
           );
-        }
-
-        return (
-          <div key={monthName} className="month-card">
-            <h3>{monthName}</h3>
-            <div className="weekday-headers">
-              {WEEKDAYS.map((d) => (
-                <span key={d}>{d}</span>
-              ))}
-            </div>
-            <div className="days-grid">{cells}</div>
-          </div>
-        );
-      })}
-    </div>
+        })}
+      </div>
+    </>
   );
 }

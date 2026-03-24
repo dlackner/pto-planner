@@ -563,6 +563,47 @@ button.secondary:hover {
   opacity: 0.6;
 }
 
+/* Balance inspector */
+.balance-inspector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.balance-inspector-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.balance-inspector-date {
+  font-weight: 600;
+}
+
+.balance-inspector-balance {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.balance-inspector-close {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.day-cell.inspected {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: -2px;
+}
+
 /* Legend */
 .legend {
   display: flex;
